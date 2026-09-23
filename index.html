@@ -266,11 +266,12 @@
         // CONFIGURATION
         // ==========================================
         // UPDATE THIS URL TO YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP URL
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwOd4vVfJF7ejYMro9XFIL-AN2OLjqMh_N2glRgjEeOjAdRZIQpWacHwmplqi86puMAVw/exec"; 
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw0GdKp3C9sC5xWrm0Z0pZfpInsdWDMz5DU3srUB8Wn5IKduxAyhrjud_E9JyCZkgMT/exec"; 
         
         let html5QrcodeScanner = null;
         let isScanning = false;
         let scanCount = 0;
+        let currentScannedData = null;
 
         function switchMode(mode) {
             if (mode === 'SCAN') {
@@ -368,8 +369,8 @@
             box.style.display = 'block';
             
             if(isSuccess) {
-                scanCount++;
-                document.getElementById('scan-count').innerText = scanCount;
+                
+                
             } else {
                 sndError.currentTime = 0;
                 sndError.play().catch(e=>console.log(e));
@@ -377,8 +378,10 @@
         }
 
         function sendToProxy(dataObj) {
+            const loader = document.getEfunction sendToProxy(dataObj) {
             const loader = document.getElementById('loader');
             loader.style.display = 'block';
+            document.getElementById('result-box').style.display = 'none';
 
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
@@ -390,35 +393,79 @@
                 loader.style.display = 'none';
                 
                 if (data.success) {
-                    let msg = `> STATUS: <span style="color:#bf0628">[ ACCESS GRANTED ]</span><br>`;
+                    currentScannedData = {
+                        operation: "CONFIRM",
+                        method: dataObj.method,
+                        name: data.personName,
+                        team: data.teamName,
+                        natID: data.natID,
+                        email: data.email,
+                        phone: data.phone
+                    };
+                    
+                    let msg = `> STATUS: <span style="color:#ff3333">[ VERIFIED - WAITING FOR CONFIRMATION ]</span><br>`;
                     msg += `> IDENTITY: <b>${data.personName}</b><br>`;
                     msg += `> TEAM: [${data.teamName}]<br>`;
                     msg += `> ID: ${data.natID}<br>`;
-                    msg += `> SECURITY: HMAC SIGNATURE VERIFIED.`;
-                    showMessage(msg, true);
+                    msg += `> SECURITY: <span style="color:#0f0">PASSED</span><br><br>`;
+                    msg += `<button onclick="confirmAttendance()" style="background:var(--cat-red);color:#000;border-color:var(--cat-red);margin-bottom:10px;">[ CONFIRM ATTENDANCE ]</button>`;
+                    msg += `<button onclick="cancelScan()" style="color:#aaa;border-color:#555;">[ CANCEL / NEXT ]</button>`;
+                    
+                    showMessage(msg, true); // True just means no error sound
                 } else {
-                    let msg = `> STATUS: <span style="color:#ff003c">[ ACCESS DENIED ]</span><br>`;
-                    msg += `> REASON: ${data.error}<br>`;
-                    msg += `> ACTION: INTRUSION ATTEMPT LOGGED.`;
+                    let msg = `> STATUS: <span style="color:var(--danger)">[ ERROR / BLOCKED ]</span><br>`;
+                    msg += `> REASON: ${data.error}<br><br>`;
+                    msg += `<button onclick="cancelScan()" style="color:#aaa;border-color:#555;">[ NEXT ]</button>`;
                     showMessage(msg, false);
                 }
-                
-                setTimeout(() => {
-                    document.getElementById('result-box').style.display = 'none';
-                    isScanning = false;
-                    if(html5QrcodeScanner) html5QrcodeScanner.resume();
-                }, 5000);
             })
             .catch(err => {
                 loader.style.display = 'none';
-                showMessage(`> [FATAL ERROR] CONNECTION TO MAINFRAME LOST.`, false);
-                setTimeout(() => {
-                    document.getElementById('result-box').style.display = 'none';
-                    isScanning = false;
-                    if(html5QrcodeScanner) html5QrcodeScanner.resume();
-                }, 4000);
+                let msg = `> [FATAL ERROR] CONNECTION TO MAINFRAME LOST.<br><br>`;
+                msg += `<button onclick="cancelScan()" style="color:#aaa;border-color:#555;">[ NEXT ]</button>`;
+                showMessage(msg, false);
             });
         }
-    </script>
-</body>
-</html>
+        
+        function confirmAttendance() {
+            if(!currentScannedData) return;
+            const loader = document.getElementById('loader');
+            loader.innerText = "> UPDATING DATABASE...";
+            loader.style.display = 'block';
+            document.getElementById('result-box').style.display = 'none';
+            
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(currentScannedData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                loader.style.display = 'none';
+                loader.innerText = "> DECRYPTING PAYLOAD & VERIFYING SIGNATURE...";
+                if(data.success) {
+                    scanCount++;
+                    document.getElementById('scan-count').innerText = scanCount;
+                    showMessage(`> <span style="color:var(--cat-red)">[ CHECK-IN COMPLETE ]</span><br>> ${currentScannedData.name} has entered the zone.<br><br><button onclick="cancelScan()" style="color:#aaa;border-color:#555;">[ NEXT SCAN ]</button>`, true);
+                    // Do not auto close, wait for user to click NEXT SCAN
+                } else {
+                    showMessage(`> [ERROR] DATABASE UPDATE FAILED: ${data.error}<br><br><button onclick="cancelScan()" style="color:#aaa;border-color:#555;">[ NEXT ]</button>`, false);
+                }
+            })
+            .catch(err => cancelScan());
+        }
+        
+        function cancelScan() {
+            document.getElementById('result-box').style.display = 'none';
+            document.getElementById('manual-email').value = '';
+            document.getElementById('manual-natid').value = '';
+            currentScannedData = null;
+            isScanning = false;
+            
+            // Resume camera if we are in SCAN mode
+            if(html5QrcodeScanner && document.getElementById('scanner-section').style.display !== 'none') {
+                html5QrcodeScanner.resume();
+            }
+        }
+    
+    
