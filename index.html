@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAT Reloaded - CATathon CTF Security Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --cat-red: #bf0628;
+            --dark-bg: #050505;
+            --panel-bg: rgba(0, 20, 0, 0.8);
+            --danger: #ff003c;
+            --terminal-font: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--terminal-font);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--cat-red);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+            background-image: 
+                linear-gradient(rgba(191, 6, 40, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(191, 6, 40, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* CRT Scanline Effect */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(191, 6, 40, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .container {
+            background: var(--panel-bg);
+            border: 1px solid var(--cat-red);
+            border-radius: 4px;
+            padding: 30px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 0 20px rgba(191, 6, 40, 0.2), inset 0 0 15px rgba(191, 6, 40, 0.1);
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 {
+            color: var(--cat-red);
+            font-size: 1.8rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 5px var(--cat-red);
+        }
+        
+        .subtitle {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+        }
+
+        .stats-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            border: 1px solid var(--cat-red);
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            box-shadow: 0 0 5px var(--cat-red);
+        }
+
+        /* Glitch Animation for Title */
+        .glitch {
+            position: relative;
+        }
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--dark-bg);
+        }
+        .glitch::before {
+            left: 2px;
+            text-shadow: -1px 0 red;
+            clip: rect(24px, 550px, 90px, 0);
+            animation: glitch-anim 2s infinite linear alternate-reverse;
+        }
+        .glitch::after {
+            left: -2px;
+            text-shadow: -1px 0 blue;
+            clip: rect(85px, 550px, 140px, 0);
+            animation: glitch-anim 2.5s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(24px, 9999px, 86px, 0); }
+            20% { clip: rect(10px, 9999px, 80px, 0); }
+            40% { clip: rect(78px, 9999px, 20px, 0); }
+            60% { clip: rect(33px, 9999px, 5px, 0); }
+            80% { clip: rect(5px, 9999px, 90px, 0); }
+            100% { clip: rect(60px, 9999px, 50px, 0); }
+        }
+
+        /* Buttons & Inputs */
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            background: rgba(0, 20, 0, 0.9);
+            border: 1px solid var(--cat-red);
+            color: var(--cat-red);
+            font-size: 16px;
+            outline: none;
+            text-align: center;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            color: var(--cat-red);
+            border: 1px solid var(--cat-red);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: var(--cat-red);
+            color: #000;
+            box-shadow: 0 0 15px var(--cat-red);
+        }
+
+        /* Scanner */
+        #reader {
+            width: 100%;
+            border: 1px solid var(--cat-red);
+            background: #000;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        /* Results Terminal */
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid var(--cat-red);
+            background: #000;
+            display: none;
+            text-align: left;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .result-success {
+            border-color: var(--cat-red);
+            color: var(--cat-red);
+            box-shadow: 0 0 10px rgba(191, 6, 40, 0.4);
+        }
+
+        .result-error {
+            border-color: var(--danger);
+            color: var(--danger);
+            box-shadow: 0 0 10px rgba(255, 0, 60, 0.4);
+        }
+
+        .typing-effect {
+            overflow: hidden;
+            border-right: .15em solid var(--cat-red);
+            white-space: nowrap;
+            margin: 0 auto;
+            letter-spacing: .15em;
+            animation: typing 1.5s steps(40, end), blink-caret .75s step-end infinite;
+        }
+
+        @keyframes typing { from { width: 0 } to { width: 100% } }
+        @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: var(--cat-red); } }
+
+        /* Loader */
+        .loader {
+            display: none;
+            color: var(--cat-red);
+            font-size: 1.2rem;
+            margin: 20px 0;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <!-- Terminal Sounds -->
+    <audio id="success-sound" src="https://actions.google.com/sounds/v1/computer/keyboard_typing.ogg" preload="auto"></audio>
+    <audio id="error-sound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+
+    <div class="container">
+        <div id="stats-badge" class="stats-badge" style="display: none;">AUTH: <span id="scan-count">0</span></div>
+
+        <h1 class="glitch" data-text="CATATHON CTF">CATATHON CTF</h1>
+        <div class="subtitle">Secure Identity Verification System</div>
+
+        <!-- Login -->
+        <div id="login-screen">
+            <p>> Enter root password to mount scanner:</p>
+            <input type="password" id="password" placeholder="root@catathon:~#" onkeypress="if(event.key === 'Enter') login()">
+            <button onclick="login()">[ EXECUTE ]</button>
+            <p id="login-error" style="color: var(--danger); margin-top: 10px; display: none;">> [ERROR] Access Denied.</p>
+        </div>
+
+        <!-- App -->
+        <div id="app-screen" style="display: none;">
+            
+            <div id="mode-switcher" style="margin-bottom: 20px;">
+                <button id="btn-scan" onclick="switchMode('SCAN')" style="width: 48%; display: inline-block; background: var(--cat-red); color: #000;">[ SCANNER ]</button>
+                <button id="btn-manual" onclick="switchMode('MANUAL')" style="width: 48%; display: inline-block;">[ MANUAL ]</button>
+            </div>
+
+            <div id="scanner-section">
+                <p style="margin-bottom: 10px;">> MOUNTING CAMERA SUBSYSTEM...</p>
+                <div id="reader"></div>
+            </div>
+
+            <div id="manual-section" style="display: none; text-align: left;">
+                <p style="margin-bottom: 10px; color: var(--cat-red);">> MANUAL OVERRIDE INITIATED...</p>
+                <input type="email" id="manual-email" placeholder="> Enter Target Email...">
+                <input type="number" id="manual-natid" placeholder="> Enter National ID (14 Digits)..." onkeypress="if(event.key === 'Enter') sendManual()">
+                <button onclick="sendManual()" style="margin-top:10px;">[ VERIFY IDENTITY ]</button>
+            </div>
+
+            </div>
+
+            <div class="loader" id="loader">> DECRYPTING PAYLOAD & VERIFYING SIGNATURE...</div>
+            <div class="result-box" id="result-box"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        // UPDATE THIS URL TO YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP URL
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw0GdKp3C9sC5xWrm0Z0pZfpInsdWDMz5DU3srUB8Wn5IKduxAyhrjud_E9JyCZkgMT/exec"; 
+        
+        let html5QrcodeScanner = null;
+        let isScanning = false;
+        let scanCount = 0;
+
+        function switchMode(mode) {
+            if (mode === 'SCAN') {
+                document.getElementById('manual-section').style.display = 'none';
+                document.getElementById('scanner-section').style.display = 'block';
+                document.getElementById('btn-scan').style.background = 'var(--cat-red)';
+                document.getElementById('btn-scan').style.color = '#000';
+                document.getElementById('btn-manual').style.background = 'transparent';
+                document.getElementById('btn-manual').style.color = 'var(--cat-red)';
+            } else {
+                document.getElementById('scanner-section').style.display = 'none';
+                document.getElementById('manual-section').style.display = 'block';
+                document.getElementById('btn-manual').style.background = 'var(--cat-red)';
+                document.getElementById('btn-manual').style.color = '#000';
+                document.getElementById('btn-scan').style.background = 'transparent';
+                document.getElementById('btn-scan').style.color = 'var(--cat-red)';
+            }
+        }
+
+        function sendManual() {
+            const email = document.getElementById('manual-email').value;
+            const natid = document.getElementById('manual-natid').value;
+            if(!email || !natid) return alert("MISSING PARAMETERS!");
+            
+            sndSuccess.currentTime = 0;
+            sndSuccess.play().catch(e=>console.log(e));
+            
+            const resultBox = document.getElementById('result-box');
+            resultBox.className = 'result-box';
+            resultBox.style.display = 'block';
+            resultBox.style.borderColor = 'var(--cat-red)';
+            resultBox.style.color = 'var(--cat-red)';
+            resultBox.innerHTML = `> SEARCHING DATABASE FOR:<br>> <strong>[ ${email} ]</strong><br>> INITIATING NOTION SYNC...`;
+
+            sendToProxy({ method: "MANUAL", email: email, natID: natid });
+        }
+
+
+        const sndSuccess = document.getElementById('success-sound');
+        const sndError = document.getElementById('error-sound');
+
+        function login() {
+            const pwd = document.getElementById('password').value;
+            if (pwd === "cat2026") { // Set your password here
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-screen').style.display = 'block';
+                document.getElementById('stats-badge').style.display = 'block';
+                startScanner();
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        }
+
+        function startScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+                fps: 10, 
+                qrbox: {width: 250, height: 250},
+                aspectRatio: 1.0
+            });
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            if (isScanning) return;
+            isScanning = true;
+            html5QrcodeScanner.pause(true);
+
+            // Play terminal typing sound
+            sndSuccess.currentTime = 0;
+            sndSuccess.play().catch(e=>console.log(e));
+
+            // Format: Name|Email|Phone|TeamName|NationalID|HMAC_SIGNATURE
+            const parts = decodedText.split('|');
+            let scannedName = "UNKNOWN_ENTITY";
+            if(parts.length === 6) {
+                scannedName = parts[0];
+            }
+
+            const resultBox = document.getElementById('result-box');
+            resultBox.className = 'result-box';
+            resultBox.style.display = 'block';
+            resultBox.style.borderColor = 'var(--cat-red)';
+            resultBox.style.color = 'var(--cat-red)';
+            resultBox.innerHTML = `> EXTRACTING IDENTITY: <br>> <strong>[ ${scannedName} ]</strong><br>> INITIATING HMAC VERIFICATION...`;
+
+            sendToProxy({ method: 'QR_SCAN', payload: decodedText });
+        }
+
+        function onScanFailure(error) {}
+
+        function showMessage(html, isSuccess) {
+            const box = document.getElementById('result-box');
+            box.className = 'result-box ' + (isSuccess ? 'result-success' : 'result-error');
+            box.innerHTML = html;
+            box.style.display = 'block';
+            
+            if(isSuccess) {
+                scanCount++;
+                document.getElementById('scan-count').innerText = scanCount;
+            } else {
+                sndError.currentTime = 0;
+                sndError.play().catch(e=>console.log(e));
+            }
+        }
+
+        function sendToProxy(dataObj) {
+            const loader = document.getElementById('loader');
+            loader.style.display = 'block';
+
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(dataObj)
+            })
+            .then(response => response.json())
+            .then(data => {
+                loader.style.display = 'none';
+                
+                if (data.success) {
+                    let msg = `> STATUS: <span style="color:#bf0628">[ ACCESS GRANTED ]</span><br>`;
+                    msg += `> IDENTITY: <b>${data.personName}</b><br>`;
+                    msg += `> TEAM: [${data.teamName}]<br>`;
+                    msg += `> ID: ${data.natID}<br>`;
+                    msg += `> SECURITY: HMAC SIGNATURE VERIFIED.`;
+                    showMessage(msg, true);
+                } else {
+                    let msg = `> STATUS: <span style="color:#ff003c">[ ACCESS DENIED ]</span><br>`;
+                    msg += `> REASON: ${data.error}<br>`;
+                    msg += `> ACTION: INTRUSION ATTEMPT LOGGED.`;
+                    showMessage(msg, false);
+                }
+                
+                setTimeout(() => {
+                    document.getElementById('result-box').style.display = 'none';
+                    isScanning = false;
+                    if(html5QrcodeScanner) html5QrcodeScanner.resume();
+                }, 5000);
+            })
+            .catch(err => {
+                loader.style.display = 'none';
+                showMessage(`> [FATAL ERROR] CONNECTION TO MAINFRAME LOST.`, false);
+                setTimeout(() => {
+                    document.getElementById('result-box').style.display = 'none';
+                    isScanning = false;
+                    if(html5QrcodeScanner) html5QrcodeScanner.resume();
+                }, 4000);
+            });
+        }
+    </script>
+</body>
+</html>
